@@ -44,17 +44,14 @@
           </div>
         </div>
       </form>
+      <div class="row">
+        <div id="chartDiv"></div>
+      </div>
+
     </div>
-    <div id="chartDiv"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <!-- JQuery - May not use it!-->
-    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js">
-    </script>
-    <script>window.jQuery || document.write('<script src="{{
-      url_for('static', filename='jquery.js') }}">\x3C/script>')
-    </script>
     <!-- D3JS Script -->
     <script>
       const SCRIPT_ROOT = {{ request.script_root|tojson }};
@@ -74,13 +71,14 @@
         for (const [_, val] of result.entries()) {
           results.push(val);
         }
+        console.log(results);
         var margin = {top:30, right:50, bottom:30, left:50};
-        var svgWidth = 1040;
-        var svgHeight = 720;
-        var graphWidth = svgWidth - margin.left - margin.right
-        var graphHeight = svgHeight - margin.top - margin.bottom
+
+        var graphWidth = d3.select('.row').node().offsetWidth - margin.left - margin.right;
+        var graphHeight = (window.innerHeight / 1.5) - margin.top - margin.bottom;
 
 
+        d3.select("#chartDiv").selectAll('*').remove();
         var svg = d3.select("#chartDiv").append("svg");
 
         var yScale = d3.scalePow().exponent(0.5)
@@ -100,8 +98,8 @@
         var min = d3.min(results.map((r) => r.margin));
         //console.log(results.map((r)=>r.margin));
         //console.log(min);
-        svg.attr('height', svgHeight + margin.top + margin.bottom)
-        .attr('width', svgWidth + margin.left + margin.right)
+        svg.attr('height', graphHeight + margin.top + margin.bottom)
+        .attr('width', graphWidth + margin.left + margin.right)
         .attr("border", 1);
 
         var svgG = svg.append("g")
@@ -114,8 +112,34 @@
           .append('rect')
           .attr("class", "bar")
           .attr("width", xScale.bandwidth())
+          .attr('height', (r) => Math.abs(yScale(r.margin) - yScale(0)))
           .attr('y', (r) => yScale(Math.max(0, r.margin)))
           .attr('x', (r) => xScale(r.constituency_name))
+          // Bootstrap popover attributes
+          .attr('data-bs-toggle', 'popover')
+          .attr('data-bs-html', 'true')
+          .attr('data-bs-title', (r) => r.constituency_name)
+          .attr('data-bs-content', function(r) {
+           var str = "Status: <b>" + r.status + '</b><br/>';
+           if (r.status == 'WON'){
+            str = str + "Won by: " + Intl.NumberFormat('en-In').format(r.margin) + '<br/>';
+           } else {
+            str = str + "Lost by: " + Intl.NumberFormat('en-In').format(-r.margin) + '<br/>';
+           }
+           str = str + "Candidate: " + r.candidate_name;
+           return str;
+          }
+          )
+          .attr('data-bs-trigger', 'hover')
+          // Mouseover
+          .on('mouseover', function (r) {
+              d3.select(this).transition()
+                .duration('50')
+               .attr('opacity', '.85');})
+          .on('mouseout', function (r) {
+              d3.select(this).transition()
+                .duration('50')
+               .attr('opacity', '1');})
           .attr('fill', function(r){
             if (r.status == "LOST") {
               return colourLost;
@@ -124,8 +148,7 @@
             }
           }).attr('title', (r) =>  r.constituency_name)
           .transition()
-          .duration(1000)
-          .attr('height', (r) => Math.abs(yScale(r.margin) - yScale(0)));
+          .duration(1000);
 
         var yAxis = d3.axisLeft().scale(yScale);
 
@@ -145,7 +168,13 @@
         .append("line")
         .attr("y1", yScale(0))
         .attr("y2", yScale(0))
-        .attr("x2", width);
+        .attr("x2", graphWidth);
+        
+
+        // Enable bootstrap Popover
+
+        const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
+        const popoverList = [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl));
 
       }
 
